@@ -21,11 +21,16 @@ export async function POST(request: Request) {
   }
 
   const internalKey = process.env.POLARIS_CONVEX_INTERNAL_KEY;
-
+  console.log(
+    "POLARIS key exists?",
+    !!process.env.POLARIS_CONVEX_INTERNAL_KEY,
+    "len:",
+    process.env.POLARIS_CONVEX_INTERNAL_KEY?.length,
+  );
   if (!internalKey) {
     return NextResponse.json(
       { error: "Internal key not configured" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -41,7 +46,7 @@ export async function POST(request: Request) {
   if (!conversation) {
     return NextResponse.json(
       { error: "Conversation not found" },
-      { status: 404 }
+      { status: 404 },
     );
   }
 
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
     {
       internalKey,
       projectId,
-    }
+    },
   );
 
   if (processingMessages.length > 0) {
@@ -72,7 +77,7 @@ export async function POST(request: Request) {
           messageId: msg._id,
           status: "cancelled",
         });
-      })
+      }),
     );
   }
 
@@ -86,17 +91,14 @@ export async function POST(request: Request) {
   });
 
   // Create assistant message placeholder with processing status
-  const assistantMessageId = await convex.mutation(
-    api.system.createMessage,
-    {
-      internalKey,
-      conversationId: conversationId as Id<"conversations">,
-      projectId,
-      role: "assistant",
-      content: "",
-      status: "processing",
-    }
-  );
+  const assistantMessageId = await convex.mutation(api.system.createMessage, {
+    internalKey,
+    conversationId: conversationId as Id<"conversations">,
+    projectId,
+    role: "assistant",
+    content: "",
+    status: "processing",
+  });
 
   // Trigger Inngest to process the message
   const event = await inngest.send({
@@ -114,4 +116,4 @@ export async function POST(request: Request) {
     eventId: event.ids[0],
     messageId: assistantMessageId,
   });
-};
+}

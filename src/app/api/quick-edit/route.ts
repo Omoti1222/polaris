@@ -2,7 +2,8 @@ import { z } from "zod";
 import { generateText, Output } from "ai";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { anthropic } from "@ai-sdk/anthropic";
+// import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
 
 import { firecrawl } from "@/lib/firecrawl";
 
@@ -10,7 +11,7 @@ const quickEditSchema = z.object({
   editedCode: z
     .string()
     .describe(
-      "The edited version of the selected code based on the instruction"
+      "The edited version of the selected code based on the instruction",
     ),
 });
 
@@ -46,23 +47,20 @@ export async function POST(request: Request) {
     const { selectedCode, fullCode, instruction } = await request.json();
 
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 400 });
     }
 
     if (!selectedCode) {
       return NextResponse.json(
         { error: "Selected code is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!instruction) {
       return NextResponse.json(
         { error: "Instruction is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,7 +83,7 @@ export async function POST(request: Request) {
           } catch {
             return null;
           }
-        })
+        }),
       );
 
       const validResults = scrapedResults.filter(Boolean);
@@ -95,14 +93,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const prompt = QUICK_EDIT_PROMPT
-      .replace("{selectedCode}", selectedCode)
+    const prompt = QUICK_EDIT_PROMPT.replace("{selectedCode}", selectedCode)
       .replace("{fullCode}", fullCode || "")
       .replace("{instruction}", instruction)
       .replace("{documentation}", documentationContext);
 
     const { output } = await generateText({
-      model: anthropic("claude-3-7-sonnet-20250219"),
+      // model: anthropic("claude-3-7-sonnet-20250219"),
+      model: google("gemini-2.5-flash"),
       output: Output.object({ schema: quickEditSchema }),
       prompt,
     });
@@ -112,7 +110,7 @@ export async function POST(request: Request) {
     console.error("Edit error:", error);
     return NextResponse.json(
       { error: "Failed to generate edit" },
-      { status: 500 }
+      { status: 500 },
     );
   }
-};
+}
