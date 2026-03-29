@@ -7,10 +7,7 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { NonRetriableError } from "inngest";
 import { convex } from "@/lib/convex-client";
 import { api } from "../../../../convex/_generated/api";
-import {
-  CODING_AGENT_SYSTEM_PROMPT,
-  TITLE_GENERATOR_SYSTEM_PROMPT,
-} from "./constants";
+import { CODING_AGENT_SYSTEM_PROMPT } from "./constants";
 import { DEFAULT_CONVERSATION_TITLE } from "../constants";
 import { createReadFilesTool } from "./tools/read-files";
 import { createListFilesTool } from "./tools/list-files";
@@ -20,6 +17,7 @@ import { createCreateFolderTool } from "./tools/create-folder";
 import { createRenameFileTool } from "./tools/rename-file";
 import { createDeleteFilesTool } from "./tools/delete-files";
 import { createScrapeUrlsTool } from "./tools/scrape-urls";
+import { generateConversationTitle } from "@/lib/generate-conversation-title";
 
 interface MessageEvent {
   messageId: Id<"messages">;
@@ -114,58 +112,39 @@ export const processMessage = inngest.createFunction(
       conversation.title === DEFAULT_CONVERSATION_TITLE;
 
     if (shouldGenerateTitle) {
-      const titleAgent = createAgent({
-        name: "title-generator",
-        system: TITLE_GENERATOR_SYSTEM_PROMPT,
-        // model: google({
-        //   model: "gemini-2.5-flash",
-        //   defaultParameters: { temperature: 0 },
-        // }),
-        model: anthropic({
-          model: "claude-3-5-haiku-20241022",
-          defaultParameters: { temperature: 0, max_tokens: 50 },
-        }),
+      const title = await step.run("title-generator", async () => {
+        return await generateConversationTitle(message);
       });
 
-      const { output } = await titleAgent.run(message, { step });
-
-      const textMessage = output.find(
-        (m) => m.type === "text" && m.role === "assistant",
-      );
-
-      if (textMessage?.type === "text") {
-        const title =
-          typeof textMessage.content === "string"
-            ? textMessage.content.trim()
-            : textMessage.content
-                .map((c) => c.text)
-                .join("")
-                .trim();
-
-        if (title) {
-          await step.run("update-conversation-title", async () => {
-            await convex.mutation(api.system.updateConversationTitle, {
-              internalKey,
-              conversationId,
-              title,
-            });
+      if (title) {
+        await step.run("update-conversation-title", async () => {
+          await convex.mutation(api.system.updateConversationTitle, {
+            internalKey,
+            conversationId,
+            title,
           });
-        }
+        });
       }
     }
-
     // Create the coding agent with file tools
     const codingAgent = createAgent({
-      name: "polaris",
-      description: "An expert AI coding assistant",
-      system: systemPrompt,
-      // model: google({
-      //   model: "gemini-2.5-flash",
-      //   defaultParameters: { temperature: 0.3 },
+      name: "Polaris coding Agent",
+      // description: "An expert AI coding assistant",
+      system: CODING_AGENT_SYSTEM_PROMPT,
+      // model: gemini({
+      //   model: "gemini-1.5-pro",
+      //   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      //   baseUrl: "https://generativelanguage.googleapis.com/v1/",
+      //   defaultParameters: {
+      //     generationConfig: {
+      //       temperature: 0.3,
+      //     },
+      //   },
       // }),
       model: anthropic({
-        model: "claude-opus-4-20250514",
-        defaultParameters: { temperature: 0.3, max_tokens: 16000 },
+        model: "claude-sonnet-4-5",
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        defaultParameters: { temperature: 0.3, max_tokens: 4096 },
       }),
       tools: [
         createListFilesTool({ internalKey, projectId }),
@@ -203,6 +182,16 @@ export const processMessage = inngest.createFunction(
         return codingAgent;
       },
     });
+    console.log("has ANTHROPIC key:", !!process.env.ANTHROPIC_API_KEY);
+    console.log("ANTHROPIC key length:", process.env.ANTHROPIC_API_KEY?.length);
+    // console.log(
+    //   "has GOOGLE key:",
+    //   Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
+    // );
+    // console.log(
+    //   "GOOGLE key length:",
+    //   process.env.GOOGLE_GENERATIVE_AI_API_KEY?.length ?? 0,
+    // );
 
     // Run the agent
     const result = await network.run(message);
