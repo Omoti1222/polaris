@@ -1,4 +1,14 @@
+# Polaris (WIP)
+
+This project is currently unfinished and not ready for use.
+
+## Status
+- Development in progress
+- Not ready for production or public use
+
 # Polaris - Build a Cursor AI Alternative
+
+
 
 This is the repository for a comprehensive [YouTube tutorial series](https://youtu.be/Xf9rHPNBMyQ) where we build a **fully-featured cloud IDE** from scratch.
 
