@@ -41,16 +41,13 @@ export async function POST(request: Request) {
   // { owner: "AntonioErdeljac", repo: "cursor-dev" }
 
   const client = await clerkClient();
-  const tokens = await client.users.getUserOauthAccessToken(
-    userId,
-    "github"
-  );
+  const tokens = await client.users.getUserOauthAccessToken(userId, "github");
   const githubToken = tokens.data[0]?.token;
 
   if (!githubToken) {
     return NextResponse.json(
       { error: "GitHub not connected. Please reconnect your GitHub account." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -59,7 +56,7 @@ export async function POST(request: Request) {
   if (!internalKey) {
     return NextResponse.json(
       { error: "Server configuration error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -69,19 +66,40 @@ export async function POST(request: Request) {
     ownerId: userId,
   });
 
-  const event = await inngest.send({
-    name: "github/import.repo",
-    data: {
-      owner,
-      repo,
-      projectId,
-      githubToken,
-    },
-  });
+  try {
+    const event = await inngest.send({
+      name: "github/import.repo",
+      data: {
+        owner,
+        repo,
+        projectId,
+        githubToken,
+      },
+    });
 
-  return NextResponse.json({ 
-    success: true, 
-    projectId, 
-    eventId: event.ids[0]
-  });
-};
+    return NextResponse.json({
+      success: true,
+      projectId,
+      eventId: event.ids[0],
+    });
+  } catch (e) {
+    // inngest.send が失敗したので project を "failed" に更新
+    await convex
+      .mutation(api.system.updateImportStatus, {
+        internalKey,
+        projectId,
+        status: "failed",
+      })
+      .catch(() => {}); //ここ自体が失敗してもログだけ出して続行
+
+    console.error(
+      "inngest.send failed:",
+      e instanceof Error ? e.message : "unknown",
+    );
+
+    return NextResponse.json(
+      { error: "Failed to start import, Please try again." },
+      { status: 500 },
+    );
+  }
+}

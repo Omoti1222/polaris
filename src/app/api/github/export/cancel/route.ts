@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!internalKey) {
     return NextResponse.json(
       { error: "Server configuration error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
     status: "cancelled",
   });
 
-  return NextResponse.json({ 
-    success: true, 
-    projectId, 
-    eventId: event.ids[0]
+  return NextResponse.json({
+    success: true,
+    projectId,
+    eventId: event.ids[0],
   });
-};
+}

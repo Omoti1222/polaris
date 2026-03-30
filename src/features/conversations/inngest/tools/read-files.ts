@@ -19,7 +19,8 @@ const paramsSchema = z.object({
 export const createReadFilesTool = ({ internalKey }: ReadFilesToolOptions) => {
   return createTool({
     name: "readFiles",
-    description: "Read the content of files from the project. Returns file contents.",
+    description:
+      "Read the content of files from the project. Returns file contents.",
     parameters: z.object({
       fileIds: z.array(z.string()).describe("Array of file IDs to read"),
     }),
@@ -35,6 +36,9 @@ export const createReadFilesTool = ({ internalKey }: ReadFilesToolOptions) => {
         return await toolStep?.run("read-files", async () => {
           const results: { id: string; name: string; content: string }[] = [];
 
+          const MAX_CONTEXT_CHARS = 80_000;
+          let totalChars = 0;
+
           for (const fileId of fileIds) {
             const file = await convex.query(api.system.getFileById, {
               internalKey,
@@ -42,12 +46,23 @@ export const createReadFilesTool = ({ internalKey }: ReadFilesToolOptions) => {
             });
 
             if (file && file.content) {
+              if (totalChars + file.content.length > MAX_CONTEXT_CHARS) {
+                results.push({
+                  id: file._id,
+                  name: file.name,
+                  content: `[省略: 合計 ${MAX_CONTEXT_CHARS}] 文字の上限に達しました]`,
+                });
+                break;
+              }
+
+              totalChars += file.content.length;
+
               results.push({
                 id: file._id,
                 name: file.name,
                 content: file.content,
               });
-            };
+            }
           }
 
           if (results.length === 0) {
@@ -55,10 +70,10 @@ export const createReadFilesTool = ({ internalKey }: ReadFilesToolOptions) => {
           }
 
           return JSON.stringify(results);
-        })
+        });
       } catch (error) {
         return `Error reading files: ${error instanceof Error ? error.message : "Unknown error"}`;
       }
-    }
+    },
   });
 };

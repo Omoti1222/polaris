@@ -14,7 +14,7 @@ export const updateSettings = mutation({
   handler: async (ctx, args) => {
     const identity = await verifyAuth(ctx);
 
-    const project = await ctx.db.get("projects", args.id);
+    const project = await ctx.db.get(args.id);
 
     if (!project) {
       throw new Error("Project not found");
@@ -24,7 +24,7 @@ export const updateSettings = mutation({
       throw new Error("Unauthorized to update this project");
     }
 
-    await ctx.db.patch("projects", args.id, {
+    await ctx.db.patch(args.id, {
       settings: args.settings,
       updatedAt: Date.now(),
     });
@@ -78,12 +78,12 @@ export const get = query({
 
 export const getById = query({
   args: {
-    id: v.id("projects")
+    id: v.id("projects"),
   },
   handler: async (ctx, args) => {
     const identity = await verifyAuth(ctx);
 
-    const project = await ctx.db.get("projects", args.id);
+    const project = await ctx.db.get(args.id);
 
     if (!project) {
       throw new Error("Project not found");
@@ -105,7 +105,7 @@ export const rename = mutation({
   handler: async (ctx, args) => {
     const identity = await verifyAuth(ctx);
 
-    const project = await ctx.db.get("projects", args.id);
+    const project = await ctx.db.get(args.id);
 
     if (!project) {
       throw new Error("Project not found");
@@ -115,7 +115,7 @@ export const rename = mutation({
       throw new Error("Unauthorized access to this project");
     }
 
-    await ctx.db.patch("projects", args.id, {
+    await ctx.db.patch(args.id, {
       name: args.name,
       updatedAt: Date.now(),
     });

@@ -41,16 +41,18 @@ export const importGithubRepo = inngest.createFunction(
 
     const internalKey = process.env.POLARIS_CONVEX_INTERNAL_KEY;
     if (!internalKey) {
-      throw new NonRetriableError("POLARIS_CONVEX_INTERNAL_KEY is not configured");
-    };
+      throw new NonRetriableError(
+        "POLARIS_CONVEX_INTERNAL_KEY is not configured",
+      );
+    }
 
     const octokit = new Octokit({ auth: githubToken });
 
     // Cleanup any existing files in the project
     await step.run("cleanup-project", async () => {
-      await convex.mutation(api.system.cleanup, { 
+      await convex.mutation(api.system.cleanup, {
         internalKey,
-        projectId
+        projectId,
       });
     });
 
@@ -118,9 +120,10 @@ export const importGithubRepo = inngest.createFunction(
     });
 
     // Get all files (blobs) from the tree
-    const allFiles = tree.tree.filter(
-      (item) => item.type === "blob" && item.path && item.sha
-    );
+    const allFiles = tree.tree
+      .filter((item) => item.type === "blob" && item.path && item.sha)
+      .filter((item) => (item.size ?? 0) < 100_000) // 100KB 超を除外
+      .slice(0, 500); // 500件でストップ
 
     await step.run("create-files", async () => {
       for (const file of allFiles) {
@@ -146,7 +149,7 @@ export const importGithubRepo = inngest.createFunction(
           if (isBinary) {
             const uploadUrl = await convex.mutation(
               api.system.generateUploadUrl,
-              { internalKey }
+              { internalKey },
             );
 
             const { storageId } = await ky
@@ -189,5 +192,5 @@ export const importGithubRepo = inngest.createFunction(
     });
 
     return { success: true, projectId };
-  }
+  },
 );
