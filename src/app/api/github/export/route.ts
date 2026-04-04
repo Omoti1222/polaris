@@ -27,7 +27,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { projectId, repoName, visibility, description } = requestSchema.parse(body);
+  const { projectId, repoName, visibility, description } =
+    requestSchema.parse(body);
 
   const client = await clerkClient();
   const tokens = await client.users.getUserOauthAccessToken(userId, "github");
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
   if (!githubToken) {
     return NextResponse.json(
       { error: "GitHub not connected. Please reconnect your GitHub account." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -45,25 +46,36 @@ export async function POST(request: Request) {
   if (!internalKey) {
     return NextResponse.json(
       { error: "Server configuration error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  const event = await inngest.send({
-    name: "github/export.repo",
-    data: {
-      projectId,
-      repoName,
-      visibility,
-      description,
-      githubToken,
-      internalKey,
-    },
-  });
+  try {
+    const event = await inngest.send({
+      name: "github/export.repo",
+      data: {
+        projectId,
+        repoName,
+        visibility,
+        description,
+        githubToken,
+        internalKey,
+      },
+    });
 
-  return NextResponse.json({ 
-    success: true, 
-    projectId, 
-    eventId: event.ids[0]
-  });
-};
+    return NextResponse.json({
+      success: true,
+      projectId,
+      eventId: event.ids[0],
+    });
+  } catch (e) {
+    console.error(
+      "inngest.send failed:",
+      e instanceof Error ? e.message : "unknown",
+    );
+    return NextResponse.json(
+      { error: "Failed to start export. Please try again." },
+      { status: 500 },
+    );
+  }
+}
